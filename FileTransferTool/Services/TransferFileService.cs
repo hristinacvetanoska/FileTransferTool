@@ -9,7 +9,7 @@
 
     public class TransferFileService : ITransferFileService
     {
-        public void TransferFile(FileData file)
+        public void TransferFile(FileData fileData)
         {
             Dictionary<long, string> chunkDataDetails = new Dictionary<long, string>();
             int maxChunkSize = 8192, i=0;
@@ -18,11 +18,11 @@
             int position = 0, totalBytesCopied = 0, bytesRead;
             int chunkIndex = 0, numberOfChunk = 0;
 
-            using (FileStream sourceFileStream = new FileStream(file.SourceFilePath, FileMode.Open, FileAccess.Read))
-            using (FileStream destinationFileStream = new FileStream(file.DestinationFilePath, FileMode.Create, FileAccess.ReadWrite))
+            using (FileStream sourceFileStream = new FileStream(fileData.SourceFilePath, FileMode.Open, FileAccess.Read))
+            using (FileStream destinationFileStream = new FileStream(fileData.DestinationFilePath, FileMode.Create, FileAccess.ReadWrite))
             using (MD5 md5 = MD5.Create())
             {
-                while ((bytesRead = sourceFileStream.Read(buffer, 0, maxChunkSize)) > 0) //reading 8MB chunks at a time
+                while ((bytesRead = sourceFileStream.Read(buffer, 0, maxChunkSize)) > 0)
                 {
                     byte[] sourceHashBytes = md5.ComputeHash(buffer);
                     var sourceHexaString = ConvertToHexadecimalString(sourceHashBytes);
@@ -57,12 +57,19 @@
                 }
             }
 
-            foreach (var chunk in chunkDataDetails) 
+            var soureceFileHexaString = ComputeSHA1Hash(fileData.SourceFilePath);
+            var destinationFileHexaString = ComputeSHA1Hash(fileData.DestinationFilePath);
+            if (soureceFileHexaString.Equals(destinationFileHexaString))
             {
-                Console.WriteLine($"{i}) position = {chunk.Key}, hash = {chunk.Value}");
-                i++;
+                Console.WriteLine($"Source SHA1:{soureceFileHexaString}");
+                Console.WriteLine($"Destination SHA1: {destinationFileHexaString}");
             }
-            Console.WriteLine("File copy completed!");
+            else
+            {
+                throw new Exception("The files don't match");
+            }
+
+            PrintChecksumAndOffset(chunkDataDetails);
 
         }
         private string ConvertToHexadecimalString(byte[] hashBytes)
@@ -73,6 +80,29 @@
                 sb.Append(b.ToString("x2"));
             }
             return sb.ToString();
+        }
+
+        private void PrintChecksumAndOffset(Dictionary<long, string> chunkDataDetails)
+        {
+            var i = 0;
+            foreach (var chunk in chunkDataDetails)
+            {
+                Console.WriteLine($"{i}) position = {chunk.Key}, hash = {chunk.Value}");
+                i++;
+            }
+            Console.WriteLine("File copy completed!");
+        }
+
+        private string ComputeSHA1Hash(string filePath)
+        {
+            var fileHexaString = string.Empty;
+            using (FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+            using (SHA1 sha1 = SHA1.Create())
+            {
+                byte[] sourceHashBytes = sha1.ComputeHash(fileStream);
+                fileHexaString = ConvertToHexadecimalString(sourceHashBytes);
+            }
+            return fileHexaString;
         }
     }
 }
