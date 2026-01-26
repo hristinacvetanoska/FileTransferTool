@@ -12,7 +12,7 @@
         public void TransferFile(FileData fileData)
         {
             Dictionary<long, string> chunkDataDetails = new Dictionary<long, string>();
-            int maxChunkSize = 8192, i=0;
+            int maxChunkSize = fileData.ChunkSize * 1024 * 1024, i=0;
             byte[] buffer = new byte[maxChunkSize];
             byte[] destinationBuffer = new byte[maxChunkSize];
             int position = 0, totalBytesCopied = 0, bytesRead;
