@@ -8,9 +8,24 @@
     using System.Text;
     using System.Threading.Tasks;
 
+    /// <summary>
+    /// Service for transferring files from a source path to a destination path in chunks.
+    /// </summary>
     public class TransferFileService : ITransferFileService
     {
+        /// <summary>
+        /// Ensures that only one chunk is written to the destination file at a time.
+        /// </summary>
         private static readonly object lockObject = new object();
+
+        /// <summary>
+        /// Transfers file from a source path to a destination path in chunks.
+        /// Each chunk is hashed using MD5 at the source and verified at the destination.
+        /// After transfer, the entire file is hashed using SHA256 for final verification.
+        /// Supports large files and concurrent chunk processing to improve performance.
+        /// </summary>
+        /// <param name="fileData">The file metadata including path, size, and chunk size.</param>
+        /// <exception cref="Exception">Thrown if the SHA256 hash of the destination file does not match the source file.</exception>
         public void TransferFile(FileData fileData)
         {
             var chunks = SplitFileInChunks(fileData);
@@ -42,6 +57,17 @@
             PrintChecksumAndOffset(chunks);
 
         }
+
+        /// <summary>
+        /// Copies a specific chunk of a file from source to destination,
+        /// computes the MD5 hash at the source, writes the chunk to the destination,
+        /// reads it back, and verifies that the destination hash matches the source.
+        /// Retries writing until the hashes match.
+        ///</summary>
+        /// <param name="chunk">The chunk information, including offset, size, and buffers.</param>
+        /// <param name="fileData">The file data including source and destination paths.</param>
+        /// <param name="destinationFileStream">The destination file stream used for writing.</param>
+        /// <exception cref="Exception">Thrown if the number of bytes read from the destination does not match the expected chunk size.</exception>
         private void CopyAndVerifyChunk(Chunk chunk, FileData fileData, FileStream destinationFileStream)
         {
             var bytesRead = 0;
@@ -85,6 +111,13 @@
                 }
             }
         }
+
+        /// <summary>
+        /// Splits the file into smaller chunks based on the specified chunk size in FileData.
+        /// Each chunk contains its offset, size, and will later hold buffers for reading/writing and md5 hash string.
+        /// </summary>
+        /// <param name="fileData">The file metadata including path, size, and chunk size.</param>
+        /// <returns>A list of chunks representing portions of the file.</returns>
         private List<Chunk> SplitFileInChunks(FileData fileData)
         {
             var numberOfChunks = (int)(fileData.FileSize / fileData.ChunkSize);
@@ -106,6 +139,12 @@
 
             return chunks;
         }
+
+        /// <summary>
+        /// Converts a byte array into its hexadecimal string representation.
+        /// </summary>
+        /// <param name="hashBytes">The byte array to convert.</param>
+        /// <returns>A string containing the hexadecimal representation of the input bytes.</returns>
         private string ConvertToHexadecimalString(byte[] hashBytes)
         {
             StringBuilder sb = new StringBuilder();
@@ -115,6 +154,13 @@
             }
             return sb.ToString();
         }
+
+        /// <summary>
+        /// Computes the SHA256 hash of the entire file at the specified path
+        /// and returns it as a hexadecimal string.
+        /// </summary>
+        /// <param name="filePath">The path of the file to compute the hash for.</param>
+        /// <returns>The SHA256 hash of the file as a hexadecimal string.</returns>
         private string ComputeSHA256Hash(string filePath)
         {
             var fileHexaString = string.Empty;
@@ -126,6 +172,12 @@
             }
             return fileHexaString;
         }
+
+        /// <summary>
+        /// Prints the MD5 checksum and file offset for each chunk in the list to the console.
+        /// Also prints a message when the file copy is completed.
+        /// </summary>
+        /// <param name="chunkDataDetails">The list of chunks containing their ID, offset, and MD5 hash.</param>
         private void PrintChecksumAndOffset(List<Chunk> chunkDataDetails)
         {
             foreach (var chunk in chunkDataDetails)

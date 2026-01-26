@@ -3,16 +3,32 @@
     using FileTransferTool.Interfaces;
     using FileTransferTool.Models;
     using System.Threading.Tasks;
+
+    /// <summary>
+    /// Coordinates reading file paths and transferring the file.
+    /// </summary>
     public class ApplicationService : IApplicationService
     {
+        /// <summary>
+        /// The service used to transfer files from source to destination.
+        /// </summary>
         private readonly ITransferFileService transferFileService;
+
+        /// <summary>
+        /// The constructor for ApplicationService.
+        /// </summary>
+        /// <param name="transferFileService"></param>
         public ApplicationService(ITransferFileService transferFileService)
         {
             this.transferFileService = transferFileService;
         }
+
+        /// <summary>
+        /// Reads source and destination paths, creates file metadata, and starts the file transfer.
+        /// </summary>
         public async Task RunAsync()
         {
-            var sourceFilePath = ReadValidSourceFile();
+            var sourceFilePath = ReadValidSourceFilePath();
             var destinationFilePath = ReadValidDestinationFile(sourceFilePath);
             var file = new FileData
             {
@@ -22,9 +38,13 @@
             };
 
             this.transferFileService.TransferFile(file);
-
         }
-        private string ReadValidSourceFile()
+
+        /// <summary>
+        /// Reads and validates the source file path from the user.
+        /// </summary>
+        /// <returns>The source file path.</returns>
+        private string ReadValidSourceFilePath()
         {
             var sourceFilePath = String.Empty;
             while (true)
@@ -40,6 +60,11 @@
             return sourceFilePath;
         }
 
+        /// <summary>
+        /// Reads and validates the destination path from the user.
+        /// </summary>
+        /// <param name="sourceFilePath">Path of the source file to construct the destination path.</param>
+        /// <returns>The complete destination file path.</returns>
         private string ReadValidDestinationFile(string sourceFilePath)
         {
             var destination = string.Empty;
