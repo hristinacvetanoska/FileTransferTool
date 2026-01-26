@@ -6,7 +6,7 @@
         public string DestinationFilePath { get; set; }
         public long FileSize { get; set; }
 
-        public int ChunkSize = 8;
+        public int ChunkSize = 8388608;
         public int ChunkCount { get; set; }
     }
 }

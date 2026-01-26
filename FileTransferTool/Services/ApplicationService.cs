@@ -18,6 +18,7 @@
             {
                 SourceFilePath = sourceFilePath,
                 DestinationFilePath = destinationFilePath,
+                FileSize = new FileInfo(sourceFilePath).Length,
             };
 
             this.transferFileService.TransferFile(file);
@@ -28,7 +29,7 @@
             var sourceFilePath = String.Empty;
             while (true)
             {
-                Console.Write("Enter source file path (e.g. c:\\source\\my_large_file.bin)");
+                Console.Write("Enter source file path (e.g. c:\\source\\my_large_file.bin): \n");
                 sourceFilePath = Console.ReadLine().Trim();
                 if (File.Exists(sourceFilePath))
                 {
@@ -45,7 +46,7 @@
             while (true)
             {
 
-                Console.Write("Enter destination path (e.g. d:\\destination\\)");
+                Console.Write("Enter destination path (e.g. d:\\destination\\): \n");
                 destination = Console.ReadLine().Trim();
                 if (Directory.Exists(destination))
                 {

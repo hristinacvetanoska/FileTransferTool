@@ -7,8 +7,9 @@
     {
         public int ChunkId { get; set; }
         public long Offset { get; set; }
-        public long Size { get; set; }
-        public byte[] Data { get; set; }
+        public int Size { get; set; }
+        public byte[] Buffer { get; set; }
+        public byte[] DestinationBuffer { get; set; }
         public string MD5 { get; set; }
     }
 }

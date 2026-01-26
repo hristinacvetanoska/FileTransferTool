@@ -6,71 +6,105 @@
     using System.IO;
     using System.Security.Cryptography;
     using System.Text;
+    using System.Threading.Tasks;
 
     public class TransferFileService : ITransferFileService
     {
+        private static readonly object lockObject = new object();
         public void TransferFile(FileData fileData)
         {
-            Dictionary<long, string> chunkDataDetails = new Dictionary<long, string>();
-            int maxChunkSize = fileData.ChunkSize * 1024 * 1024, i=0;
-            byte[] buffer = new byte[maxChunkSize];
-            byte[] destinationBuffer = new byte[maxChunkSize];
-            int position = 0, totalBytesCopied = 0, bytesRead;
-            int chunkIndex = 0, numberOfChunk = 0;
+            var chunks = SplitFileInChunks(fileData);
 
-            using (FileStream sourceFileStream = new FileStream(fileData.SourceFilePath, FileMode.Open, FileAccess.Read))
-            using (FileStream destinationFileStream = new FileStream(fileData.DestinationFilePath, FileMode.Create, FileAccess.ReadWrite))
-            using (MD5 md5 = MD5.Create())
+            using (var destStream = new FileStream(fileData.DestinationFilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite))
             {
-                while ((bytesRead = sourceFileStream.Read(buffer, 0, maxChunkSize)) > 0)
+                Parallel.ForEach(chunks, new ParallelOptions { MaxDegreeOfParallelism = 4 }, chunk =>
                 {
-                    byte[] sourceHashBytes = md5.ComputeHash(buffer);
-                    var sourceHexaString = ConvertToHexadecimalString(sourceHashBytes);
-                    chunkDataDetails.Add(position, sourceHexaString);
-
-                    numberOfChunk++;
-                    totalBytesCopied = totalBytesCopied + bytesRead;
-                    position += bytesRead;
-
-                    var chunkHashVerification = false;
-                    while (!chunkHashVerification)
-                    {
-                        destinationFileStream.Write(buffer, 0, bytesRead);
-                        destinationFileStream.Flush();
-                        destinationFileStream.Seek(position - bytesRead, SeekOrigin.Begin);
-
-                        var destinationBytesRead = destinationFileStream.Read(destinationBuffer, 0, bytesRead);
-
-                        if (destinationBytesRead != bytesRead)
-                        {
-                            throw new Exception("Could not read the expected chunk size from destination!");
-                        }
-
-                        byte[] destinationHashBytes = md5.ComputeHash(buffer);
-                        var destinationHexaString = ConvertToHexadecimalString(destinationHashBytes);
-
-                        if (sourceHexaString.Equals(destinationHexaString))
-                        {
-                            chunkHashVerification = true;
-                        }
-                    }
-                }
+                    chunk.Buffer = new byte[chunk.Size];
+                    chunk.DestinationBuffer = new byte[chunk.Size];
+                    CopyAndVerifyChunk(chunk, fileData, destStream);
+                });
             }
 
-            var soureceFileHexaString = ComputeSHA1Hash(fileData.SourceFilePath);
-            var destinationFileHexaString = ComputeSHA1Hash(fileData.DestinationFilePath);
-            if (soureceFileHexaString.Equals(destinationFileHexaString))
+
+            //comment: I decided to use SHA256 because it is better and more secure compared with SHA1
+            var sourceFileHexaString = ComputeSHA256Hash(fileData.SourceFilePath);
+            var destinationFileHexaString = ComputeSHA256Hash(fileData.DestinationFilePath);
+            if (sourceFileHexaString.Equals(destinationFileHexaString))
             {
-                Console.WriteLine($"Source SHA1:{soureceFileHexaString}");
-                Console.WriteLine($"Destination SHA1: {destinationFileHexaString}");
+                Console.WriteLine($"Source SHA256:{sourceFileHexaString}");
+                Console.WriteLine($"Destination SHA256: {destinationFileHexaString}");
             }
             else
             {
                 throw new Exception("The files don't match");
             }
 
-            PrintChecksumAndOffset(chunkDataDetails);
+            PrintChecksumAndOffset(chunks);
 
+        }
+        private void CopyAndVerifyChunk(Chunk chunk, FileData fileData, FileStream destinationFileStream)
+        {
+            var bytesRead = 0;
+            var sourceHexaString = string.Empty;
+            using (FileStream sourceFileStream = new FileStream(fileData.SourceFilePath, FileMode.Open, FileAccess.Read)) 
+            using(MD5 md5 = MD5.Create())
+            {
+                sourceFileStream.Seek(chunk.Offset, SeekOrigin.Begin);
+                bytesRead = sourceFileStream.Read(chunk.Buffer, 0, chunk.Size);
+                byte[] sourceHashBytes = md5.ComputeHash(chunk.Buffer);
+                sourceHexaString = ConvertToHexadecimalString(sourceHashBytes);
+            }
+
+            var chunkHashVerification = false;
+            while (!chunkHashVerification)
+            {
+                lock (lockObject)
+                {
+                    destinationFileStream.Seek(chunk.Offset, SeekOrigin.Begin);
+                    destinationFileStream.Write(chunk.Buffer, 0, bytesRead);
+                    destinationFileStream.Flush();
+                    destinationFileStream.Seek(chunk.Offset, SeekOrigin.Begin);
+                    var destinationBytesRead = destinationFileStream.Read(chunk.DestinationBuffer, 0, bytesRead);
+
+                    if (destinationBytesRead != bytesRead)
+                    {
+                        throw new Exception("Could not read the expected chunk size from destination!");
+                    }
+
+                    using (MD5 md5 = MD5.Create())
+                    {
+                        byte[] destinationHashBytes = md5.ComputeHash(chunk.DestinationBuffer);
+                        var destinationHexaString = ConvertToHexadecimalString(destinationHashBytes);
+
+                        if (sourceHexaString.Equals(destinationHexaString))
+                        {
+                            chunk.MD5 = sourceHexaString;
+                            chunkHashVerification = true;
+                        }
+                    }
+                }
+            }
+        }
+        private List<Chunk> SplitFileInChunks(FileData fileData)
+        {
+            var numberOfChunks = (int)(fileData.FileSize / fileData.ChunkSize);
+            var chunks = new List<Chunk>();
+            if (fileData.FileSize % fileData.ChunkSize != 0)
+            {
+                numberOfChunks += 1;
+            }
+
+            for (int i = 0; i < numberOfChunks; i++)
+            {
+                chunks.Add(new Chunk
+                {
+                    ChunkId = i,
+                    Offset = i * fileData.ChunkSize,
+                    Size = Convert.ToInt32((i * fileData.ChunkSize + fileData.ChunkSize <= fileData.FileSize) ? fileData.ChunkSize : fileData.FileSize - i * fileData.ChunkSize),
+                });
+            }
+
+            return chunks;
         }
         private string ConvertToHexadecimalString(byte[] hashBytes)
         {
@@ -81,28 +115,24 @@
             }
             return sb.ToString();
         }
-
-        private void PrintChecksumAndOffset(Dictionary<long, string> chunkDataDetails)
-        {
-            var i = 0;
-            foreach (var chunk in chunkDataDetails)
-            {
-                Console.WriteLine($"{i}) position = {chunk.Key}, hash = {chunk.Value}");
-                i++;
-            }
-            Console.WriteLine("File copy completed!");
-        }
-
-        private string ComputeSHA1Hash(string filePath)
+        private string ComputeSHA256Hash(string filePath)
         {
             var fileHexaString = string.Empty;
             using (FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
-            using (SHA1 sha1 = SHA1.Create())
+            using (SHA256 sha256 = SHA256.Create())
             {
-                byte[] sourceHashBytes = sha1.ComputeHash(fileStream);
+                byte[] sourceHashBytes = sha256.ComputeHash(fileStream);
                 fileHexaString = ConvertToHexadecimalString(sourceHashBytes);
             }
             return fileHexaString;
+        }
+        private void PrintChecksumAndOffset(List<Chunk> chunkDataDetails)
+        {
+            foreach (var chunk in chunkDataDetails)
+            {
+                Console.WriteLine($"{chunk.ChunkId}) position = {chunk.Offset}, hash = {chunk.MD5}");
+            }
+            Console.WriteLine("File copy completed!");
         }
     }
 }
