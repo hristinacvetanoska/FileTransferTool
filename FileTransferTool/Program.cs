@@ -1,31 +1,20 @@
-﻿class Program
+﻿using FileTransferTool.Interfaces;
+using FileTransferTool.Services;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+internal class Program
 {
-    static void Main()
+    static async Task Main(string[] args)
     {
-        var sourceFilePath = String.Empty;
-        var destination = String.Empty;
-        while (true) {
-            Console.Write("Enter source file path (e.g. c:\\source\\my_large_file.bin)");
-            sourceFilePath = Console.ReadLine().Trim();
-            if (File.Exists(sourceFilePath))
+        using IHost host = Host.CreateDefaultBuilder(args)
+            .ConfigureServices((_, services) =>
             {
-                break;
-            }
-            Console.WriteLine("Error: The File doesn't exist, please try again.");
-        }
+                services.AddScoped<ITransferFileService, TransferFileService>();
+                services.AddScoped<IApplicationService, ApplicationService>();
+            })
+            .Build();
 
-        while (true) {
-
-            Console.Write("Enter destination path (e.g. d:\\destination\\)");
-            destination = Console.ReadLine().Trim();
-            if (Directory.Exists(destination))
-            {
-                break;
-            }
-            Console.WriteLine($"Directory {destination} does not exist!");
-        }
-        var destionationFilePath = Path.Combine(destination, Path.GetFileName(sourceFilePath));
-        Console.WriteLine($"Full destination file path is: {destionationFilePath}");
-        Console.ReadLine();
+        var app = host.Services.GetRequiredService<IApplicationService>();
+        await app.RunAsync();
     }
 }

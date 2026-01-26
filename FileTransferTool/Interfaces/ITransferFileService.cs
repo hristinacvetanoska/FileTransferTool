@@ -2,7 +2,7 @@
 {
     using FileTransferTool.Models;
 
-    public interface ITransferFile
+    public interface ITransferFileService
     {
         void TransferFile(FileData file);
     }
