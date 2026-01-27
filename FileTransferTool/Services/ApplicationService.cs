@@ -68,20 +68,27 @@
         private string ReadValidDestinationFile(string sourceFilePath)
         {
             var destination = string.Empty;
+            var destinationFilePath = string.Empty;
             while (true)
             {
 
                 Console.Write("Enter destination path (e.g. d:\\destination\\): \n");
                 destination = Console.ReadLine().Trim();
-                if (Directory.Exists(destination))
+                if (!Directory.Exists(destination))
                 {
-                    break;
+                    Console.WriteLine($"Please try again, provided destination folder path {destination} does not exist.");
+                    continue;
                 }
-                Console.WriteLine($"Directory {destination} does not exist!");
+
+                destinationFilePath = Path.Combine(destination, Path.GetFileName(sourceFilePath));
+
+                if (string.Equals(destinationFilePath, sourceFilePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine($"Please try again, the destination file path cannot be the same as the source file path.");
+                    continue;
+                }
+                return destinationFilePath;
             }
-            var destionationFilePath = Path.Combine(destination, Path.GetFileName(sourceFilePath));
-            Console.WriteLine($"Full destination file path is: {destionationFilePath}");
-            return destionationFilePath;
         }
     }
 }

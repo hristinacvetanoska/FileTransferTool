@@ -44,14 +44,16 @@
             //comment: I decided to use SHA256 because it is better and more secure compared with SHA1
             var sourceFileHexaString = HashHelper.ComputeSHA256Hash(fileData.SourceFilePath);
             var destinationFileHexaString = HashHelper.ComputeSHA256Hash(fileData.DestinationFilePath);
+            Console.WriteLine($"Source SHA256:{sourceFileHexaString}");
+            Console.WriteLine($"Destination SHA256: {destinationFileHexaString}");
+
             if (sourceFileHexaString.Equals(destinationFileHexaString))
             {
-                Console.WriteLine($"Source SHA256:{sourceFileHexaString}");
-                Console.WriteLine($"Destination SHA256: {destinationFileHexaString}");
+                Console.WriteLine("The files are identical.");
             }
             else
             {
-                throw new Exception("The files don't match");
+                throw new Exception("The files do not match.");
             }
 
             PrintChecksumAndOffset(chunks);
@@ -82,7 +84,9 @@
             }
 
             var chunkHashVerification = false;
-            while (!chunkHashVerification)
+            var retryCount = 3;
+            //comment: I decided to add retryCount to prevent infinite loop if something goes wrong.
+            while (!chunkHashVerification && retryCount>0)
             {
                 lock (lockObject)
                 {
@@ -101,11 +105,15 @@
                     {
                         byte[] destinationHashBytes = md5.ComputeHash(chunk.DestinationBuffer);
                         var destinationHexaString = HashHelper.ConvertToHexadecimalString(destinationHashBytes);
-
                         if (sourceHexaString.Equals(destinationHexaString))
                         {
                             chunk.MD5 = sourceHexaString;
                             chunkHashVerification = true;
+                        }
+                        else
+                        {
+                            retryCount--;
+                            Console.WriteLine($"The source md5 hash does not match the destination md5 hash for chunk with id = {chunk.ChunkId}!");
                         }
                     }
                 }
@@ -114,7 +122,6 @@
 
         /// <summary>
         /// Prints the MD5 checksum and file offset for each chunk in the list to the console.
-        /// Also prints a message when the file copy is completed.
         /// </summary>
         /// <param name="chunkDataDetails">The list of chunks containing their ID, offset, and MD5 hash.</param>
         private void PrintChecksumAndOffset(List<Chunk> chunkDataDetails)
@@ -123,7 +130,6 @@
             {
                 Console.WriteLine($"{chunk.ChunkId}) position = {chunk.Offset}, hash = {chunk.MD5}");
             }
-            Console.WriteLine("File copy completed!");
         }
     }
 }
