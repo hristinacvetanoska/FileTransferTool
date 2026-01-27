@@ -1,11 +1,11 @@
 ﻿namespace FileTransferTool.Services
 {
+    using FileTransferTool.Helpers;
     using FileTransferTool.Interfaces;
     using FileTransferTool.Models;
     using System;
     using System.IO;
     using System.Security.Cryptography;
-    using System.Text;
     using System.Threading.Tasks;
 
     /// <summary>
@@ -28,7 +28,7 @@
         /// <exception cref="Exception">Thrown if the SHA256 hash of the destination file does not match the source file.</exception>
         public void TransferFile(FileData fileData)
         {
-            var chunks = SplitFileInChunks(fileData);
+            var chunks = FileHelper.SplitFileInChunks(fileData);
 
             using (var destStream = new FileStream(fileData.DestinationFilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite))
             {
@@ -42,8 +42,8 @@
 
 
             //comment: I decided to use SHA256 because it is better and more secure compared with SHA1
-            var sourceFileHexaString = ComputeSHA256Hash(fileData.SourceFilePath);
-            var destinationFileHexaString = ComputeSHA256Hash(fileData.DestinationFilePath);
+            var sourceFileHexaString = HashHelper.ComputeSHA256Hash(fileData.SourceFilePath);
+            var destinationFileHexaString = HashHelper.ComputeSHA256Hash(fileData.DestinationFilePath);
             if (sourceFileHexaString.Equals(destinationFileHexaString))
             {
                 Console.WriteLine($"Source SHA256:{sourceFileHexaString}");
@@ -78,7 +78,7 @@
                 sourceFileStream.Seek(chunk.Offset, SeekOrigin.Begin);
                 bytesRead = sourceFileStream.Read(chunk.Buffer, 0, chunk.Size);
                 byte[] sourceHashBytes = md5.ComputeHash(chunk.Buffer);
-                sourceHexaString = ConvertToHexadecimalString(sourceHashBytes);
+                sourceHexaString = HashHelper.ConvertToHexadecimalString(sourceHashBytes);
             }
 
             var chunkHashVerification = false;
@@ -100,7 +100,7 @@
                     using (MD5 md5 = MD5.Create())
                     {
                         byte[] destinationHashBytes = md5.ComputeHash(chunk.DestinationBuffer);
-                        var destinationHexaString = ConvertToHexadecimalString(destinationHashBytes);
+                        var destinationHexaString = HashHelper.ConvertToHexadecimalString(destinationHashBytes);
 
                         if (sourceHexaString.Equals(destinationHexaString))
                         {
@@ -110,67 +110,6 @@
                     }
                 }
             }
-        }
-
-        /// <summary>
-        /// Splits the file into smaller chunks based on the specified chunk size in FileData.
-        /// Each chunk contains its offset, size, and will later hold buffers for reading/writing and md5 hash string.
-        /// </summary>
-        /// <param name="fileData">The file metadata including path, size, and chunk size.</param>
-        /// <returns>A list of chunks representing portions of the file.</returns>
-        private List<Chunk> SplitFileInChunks(FileData fileData)
-        {
-            var numberOfChunks = (int)(fileData.FileSize / fileData.ChunkSize);
-            var chunks = new List<Chunk>();
-            if (fileData.FileSize % fileData.ChunkSize != 0)
-            {
-                numberOfChunks += 1;
-            }
-
-            for (int i = 0; i < numberOfChunks; i++)
-            {
-                chunks.Add(new Chunk
-                {
-                    ChunkId = i,
-                    Offset = i * fileData.ChunkSize,
-                    Size = Convert.ToInt32((i * fileData.ChunkSize + fileData.ChunkSize <= fileData.FileSize) ? fileData.ChunkSize : fileData.FileSize - i * fileData.ChunkSize),
-                });
-            }
-
-            return chunks;
-        }
-
-        /// <summary>
-        /// Converts a byte array into its hexadecimal string representation.
-        /// </summary>
-        /// <param name="hashBytes">The byte array to convert.</param>
-        /// <returns>A string containing the hexadecimal representation of the input bytes.</returns>
-        private string ConvertToHexadecimalString(byte[] hashBytes)
-        {
-            StringBuilder sb = new StringBuilder();
-            foreach (byte b in hashBytes)
-            {
-                sb.Append(b.ToString("x2"));
-            }
-            return sb.ToString();
-        }
-
-        /// <summary>
-        /// Computes the SHA256 hash of the entire file at the specified path
-        /// and returns it as a hexadecimal string.
-        /// </summary>
-        /// <param name="filePath">The path of the file to compute the hash for.</param>
-        /// <returns>The SHA256 hash of the file as a hexadecimal string.</returns>
-        private string ComputeSHA256Hash(string filePath)
-        {
-            var fileHexaString = string.Empty;
-            using (FileStream fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
-            using (SHA256 sha256 = SHA256.Create())
-            {
-                byte[] sourceHashBytes = sha256.ComputeHash(fileStream);
-                fileHexaString = ConvertToHexadecimalString(sourceHashBytes);
-            }
-            return fileHexaString;
         }
 
         /// <summary>
