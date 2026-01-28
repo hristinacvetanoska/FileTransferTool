@@ -2,11 +2,12 @@
 {
     using FileTransferTool.Models;
     using FileTransferTool.Services;
+    using System.Threading.Tasks;
 
     public class TransferFileServiceTests
     {
         [Fact]
-        public void TransferFile_CopiesFileAndVerifiesHashes()
+        public async Task TransferFile_CopiesFileAndVerifiesHashesAsync()
         {
             // Arrange
             var fileName = Path.GetRandomFileName();
@@ -29,7 +30,7 @@
             var service = new TransferFileService();
 
             // Act
-            service.TransferFile(fileData);
+            await service.TransferFile(fileData);
 
             // Assert
             Assert.True(File.Exists(sourceFilePath));

@@ -14,9 +14,9 @@
     public class TransferFileService : ITransferFileService
     {
         /// <summary>
-        /// Ensures that only one chunk is written to the destination file at a time.
+        /// Limits up to 8 parallel tasks to read/write chunks at the same time.
         /// </summary>
-        private static readonly object lockObject = new object();
+        private static readonly SemaphoreSlim semaphore = new SemaphoreSlim(8);
 
         /// <summary>
         /// Transfers file from a source path to a destination path in chunks.
@@ -26,20 +26,33 @@
         /// </summary>
         /// <param name="fileData">The file metadata including path, size, and chunk size.</param>
         /// <exception cref="Exception">Thrown if the SHA256 hash of the destination file does not match the source file.</exception>
-        public void TransferFile(FileData fileData)
+        public async Task TransferFile(FileData fileData)
         {
             var chunks = FileHelper.SplitFileInChunks(fileData);
+            var tasks = new List<Task>();
 
-            using (var destStream = new FileStream(fileData.DestinationFilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite))
+            foreach (var chunk in chunks)
             {
-                Parallel.ForEach(chunks, new ParallelOptions { MaxDegreeOfParallelism = 4 }, chunk =>
+                tasks.Add(Task.Run(async () =>
                 {
-                    chunk.Buffer = new byte[chunk.Size];
-                    chunk.DestinationBuffer = new byte[chunk.Size];
-                    CopyAndVerifyChunk(chunk, fileData, destStream);
-                });
+                    await semaphore.WaitAsync();
+                    try
+                    {
+                        using var destStream = new FileStream(fileData.DestinationFilePath, FileMode.OpenOrCreate,
+                                                   FileAccess.ReadWrite, FileShare.ReadWrite, 8192, true);
+
+                        chunk.Buffer = new byte[chunk.Size];
+                        chunk.DestinationBuffer = new byte[chunk.Size];
+                        await CopyAndVerifyChunk(chunk, fileData, destStream);
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }));
             }
 
+            await Task.WhenAll(tasks);
 
             //comment: I decided to use SHA256 because it is better and more secure compared with SHA1
             var sourceFileHexaString = HashHelper.ComputeSHA256Hash(fileData.SourceFilePath);
@@ -68,9 +81,8 @@
         ///</summary>
         /// <param name="chunk">The chunk information, including offset, size, and buffers.</param>
         /// <param name="fileData">The file data including source and destination paths.</param>
-        /// <param name="destinationFileStream">The destination file stream used for writing.</param>
         /// <exception cref="Exception">Thrown if the number of bytes read from the destination does not match the expected chunk size.</exception>
-        private void CopyAndVerifyChunk(Chunk chunk, FileData fileData, FileStream destinationFileStream)
+        private async Task CopyAndVerifyChunk(Chunk chunk, FileData fileData, FileStream destinationFileStream)
         {
             var bytesRead = 0;
             var sourceHexaString = string.Empty;
@@ -78,7 +90,7 @@
             using(MD5 md5 = MD5.Create())
             {
                 sourceFileStream.Seek(chunk.Offset, SeekOrigin.Begin);
-                bytesRead = sourceFileStream.Read(chunk.Buffer, 0, chunk.Size);
+                bytesRead = await sourceFileStream.ReadAsync(chunk.Buffer, 0, chunk.Size);
                 byte[] sourceHashBytes = md5.ComputeHash(chunk.Buffer);
                 sourceHexaString = HashHelper.ConvertToHexadecimalString(sourceHashBytes);
             }
@@ -88,33 +100,29 @@
             //comment: I decided to add retryCount to prevent infinite loop if something goes wrong.
             while (!chunkHashVerification && retryCount>0)
             {
-                lock (lockObject)
+                destinationFileStream.Seek(chunk.Offset, SeekOrigin.Begin);
+                await destinationFileStream.WriteAsync(chunk.Buffer, 0, bytesRead);
+                await destinationFileStream.FlushAsync();
+                destinationFileStream.Seek(chunk.Offset, SeekOrigin.Begin);
+                var destinationBytesRead = await destinationFileStream.ReadAsync(chunk.DestinationBuffer, 0, bytesRead);
+
+                if (destinationBytesRead != bytesRead)
                 {
-                    destinationFileStream.Seek(chunk.Offset, SeekOrigin.Begin);
-                    destinationFileStream.Write(chunk.Buffer, 0, bytesRead);
-                    destinationFileStream.Flush();
-                    destinationFileStream.Seek(chunk.Offset, SeekOrigin.Begin);
-                    var destinationBytesRead = destinationFileStream.Read(chunk.DestinationBuffer, 0, bytesRead);
-
-                    if (destinationBytesRead != bytesRead)
+                    throw new Exception("Could not read the expected chunk size from destination!");
+                }
+                using (MD5 md5 = MD5.Create())
+                {
+                    byte[] destinationHashBytes = md5.ComputeHash(chunk.DestinationBuffer);
+                    var destinationHexaString = HashHelper.ConvertToHexadecimalString(destinationHashBytes);
+                    if (sourceHexaString.Equals(destinationHexaString))
                     {
-                        throw new Exception("Could not read the expected chunk size from destination!");
+                        chunk.MD5 = sourceHexaString;
+                        chunkHashVerification = true;
                     }
-
-                    using (MD5 md5 = MD5.Create())
+                    else
                     {
-                        byte[] destinationHashBytes = md5.ComputeHash(chunk.DestinationBuffer);
-                        var destinationHexaString = HashHelper.ConvertToHexadecimalString(destinationHashBytes);
-                        if (sourceHexaString.Equals(destinationHexaString))
-                        {
-                            chunk.MD5 = sourceHexaString;
-                            chunkHashVerification = true;
-                        }
-                        else
-                        {
-                            retryCount--;
-                            Console.WriteLine($"The source md5 hash does not match the destination md5 hash for chunk with id = {chunk.ChunkId}!");
-                        }
+                        retryCount--;
+                        Console.WriteLine($"The source md5 hash does not match the destination md5 hash for chunk with id = {chunk.ChunkId}!");
                     }
                 }
             }

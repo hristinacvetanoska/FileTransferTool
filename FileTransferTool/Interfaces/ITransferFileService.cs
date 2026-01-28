@@ -16,6 +16,6 @@
         /// <param name="fileData">The file metadata including path, size, and chunk size.</param>
         /// <exception cref="Exception">Thrown if the SHA256 hash of the destination file does not match the source file.</exception>
 
-        void TransferFile(FileData file);
+        Task TransferFile(FileData file);
     }
 }

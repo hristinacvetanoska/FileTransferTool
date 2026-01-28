@@ -37,7 +37,7 @@
                 FileSize = new FileInfo(sourceFilePath).Length,
             };
 
-            this.transferFileService.TransferFile(file);
+            await this.transferFileService.TransferFile(file);
         }
 
         /// <summary>
