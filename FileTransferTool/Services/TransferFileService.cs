@@ -87,7 +87,7 @@
         {
             var bytesRead = 0;
             var sourceHexaString = string.Empty;
-            using (FileStream sourceFileStream = new FileStream(fileData.SourceFilePath, FileMode.Open, FileAccess.Read)) 
+            using (FileStream sourceFileStream = new FileStream(fileData.SourceFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 8192, useAsync: true)) 
             using(MD5 md5 = MD5.Create())
             {
                 sourceFileStream.Seek(chunk.Offset, SeekOrigin.Begin);
