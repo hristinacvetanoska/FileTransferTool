@@ -1,6 +1,8 @@
-﻿using FileTransferTool.Helpers;
-namespace FileTransferTool.Tests.HelpersTests
+﻿namespace FileTransferTool.Tests.HelpersTests
 {
+    using FileTransferTool.Helpers;
+    using Xunit;
+
     /// <summary>
     /// Test class for HashHelper.
     /// </summary>

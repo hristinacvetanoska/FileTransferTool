@@ -2,6 +2,7 @@
 {
     using FileTransferTool.Helpers;
     using FileTransferTool.Models;
+    using Xunit;
 
     /// <summary>
     /// Test class for FileHelper
