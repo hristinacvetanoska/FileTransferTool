@@ -1,5 +1,6 @@
 ﻿namespace FileTransferTool.Services
 {
+    using FileTransferTool.Exceptions;
     using FileTransferTool.Interfaces;
     using FileTransferTool.Models;
     using System.Threading.Tasks;
@@ -28,16 +29,32 @@
         /// </summary>
         public async Task RunAsync()
         {
-            var sourceFilePath = ReadValidSourceFilePath();
-            var destinationFilePath = ReadValidDestinationFile(sourceFilePath);
-            var file = new FileData
+            try
             {
-                SourceFilePath = sourceFilePath,
-                DestinationFilePath = destinationFilePath,
-                FileSize = new FileInfo(sourceFilePath).Length,
-            };
+                var sourceFilePath = ReadValidSourceFilePath();
+                var destinationFilePath = ReadValidDestinationFile(sourceFilePath);
+                var file = new FileData
+                {
+                    SourceFilePath = sourceFilePath,
+                    DestinationFilePath = destinationFilePath,
+                    FileSize = new FileInfo(sourceFilePath).Length,
+                };
 
-            await this.transferFileService.TransferFile(file);
+                await this.transferFileService.TransferFile(file);
+            }
+            catch(ChunkVerificationException cvException)
+            {
+                Console.WriteLine(cvException.Message);
+            }
+            catch(IOException ioException)
+            {
+                Console.WriteLine(ioException.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unexpected error: {ex.Message}");
+            }
+
         }
 
         /// <summary>

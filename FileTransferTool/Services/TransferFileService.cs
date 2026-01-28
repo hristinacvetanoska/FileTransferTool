@@ -1,5 +1,6 @@
 ﻿namespace FileTransferTool.Services
 {
+    using FileTransferTool.Exceptions;
     using FileTransferTool.Helpers;
     using FileTransferTool.Interfaces;
     using FileTransferTool.Models;
@@ -108,12 +109,13 @@
 
                 if (destinationBytesRead != bytesRead)
                 {
-                    throw new Exception("Could not read the expected chunk size from destination!");
+                    throw new IOException("Could not read the expected chunk size from destination!");
                 }
                 using (MD5 md5 = MD5.Create())
                 {
                     byte[] destinationHashBytes = md5.ComputeHash(chunk.DestinationBuffer);
                     var destinationHexaString = HashHelper.ConvertToHexadecimalString(destinationHashBytes);
+
                     if (sourceHexaString.Equals(destinationHexaString))
                     {
                         chunk.MD5 = sourceHexaString;
@@ -126,6 +128,9 @@
                     }
                 }
             }
+
+            if (!chunkHashVerification)
+                throw new ChunkVerificationException($"Failed to verify chunk {chunk.ChunkId} after 3 attempts.");
         }
 
         /// <summary>

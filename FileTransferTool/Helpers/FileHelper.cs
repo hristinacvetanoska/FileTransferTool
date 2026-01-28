@@ -12,14 +12,14 @@
         /// <returns>A list of chunks representing portions of the file.</returns>
         public static List<Chunk> SplitFileInChunks(FileData fileData)
         {
-            var numberOfChunks = (int)(fileData.FileSize / fileData.ChunkSize);
+            var numberOfChunks = (fileData.FileSize / fileData.ChunkSize);
             var chunks = new List<Chunk>();
             if (fileData.FileSize % fileData.ChunkSize != 0)
             {
                 numberOfChunks += 1;
             }
 
-            for (int i = 0; i < numberOfChunks; i++)
+            for (long i = 0; i < numberOfChunks; i++)
             {
                 chunks.Add(new Chunk
                 {
