@@ -4,21 +4,19 @@ FileTransferTool is a C# console application designed to efficiently transfer la
 The application ensures data integrity by splitting files into chunks, verifying each chunk using MD5 hashes, and performing a final SHA256 hash check on the complete file. 
 This makes it reliable for handling large files or scenarios where accuracy is critical.
 
-## Features
-
+### Features
 - Transfers large files by splitting them into chunks
-- Verifies each chunk using MD5 hashing
+- Verifies each chunk using MD5 hashing, with up to 3 retries if verification fails
 - Performs final file integrity validation using SHA256
-- Supports parallel chunk processing for better performance
+- Supports parallel chunk processing for better performance (up to 8 concurrent chunks)
 - Prevents copying a file onto itself
 
 ## Technologies
-
-- C#
-- .NET
-- Parallel Programming
-- Cryptography (MD5, SHA256)
-- Console Application
+- C# 
+- .NET 10 
+- Async/Await
+- MD5/SHA256 hashing
+- SemaphoreSlim for concurrency
 
 ## Project Structure
 
