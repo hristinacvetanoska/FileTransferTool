@@ -12,12 +12,11 @@ This makes it reliable for handling large files or scenarios where accuracy is c
 - Prevents copying a file onto itself
 
 ## Technologies
-
-- C#
-- .NET
-- Parallel Programming
-- Cryptography (MD5, SHA256)
-- Console Application
+- C# 
+- .NET 10 
+- Async/Await
+- MD5/SHA256 hashing
+- SemaphoreSlim for concurrency
 
 ## Project Structure
 
